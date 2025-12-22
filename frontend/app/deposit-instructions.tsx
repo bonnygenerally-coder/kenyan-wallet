@@ -1,0 +1,264 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SPACING, FONT_SIZES, formatKES } from '../src/constants/theme';
+import { confirmDeposit } from '../src/utils/api';
+
+export default function DepositInstructionsScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    transactionId: string;
+    amount: string;
+    paybill: string;
+    accountNumber: string;
+  }>();
+  const [confirming, setConfirming] = useState(false);
+
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      await confirmDeposit(params.transactionId!);
+      Alert.alert(
+        'Success',
+        `Your deposit of ${formatKES(parseFloat(params.amount || '0'))} has been credited to your account!`,
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+      );
+    } catch (error: any) {
+      const message = error.response?.data?.detail || 'Failed to confirm deposit';
+      Alert.alert('Error', message);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+        </TouchableOpacity>
+        <Text style={styles.title}>M-Pesa Instructions</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.amountCard}>
+          <Text style={styles.amountLabel}>Amount to Deposit</Text>
+          <Text style={styles.amountValue}>
+            {formatKES(parseFloat(params.amount || '0'))}
+          </Text>
+        </View>
+
+        <View style={styles.instructionsCard}>
+          <Text style={styles.instructionsTitle}>Follow these steps:</Text>
+
+          <Step number={1} text="Go to M-Pesa on your phone" />
+          <Step number={2} text="Select 'Lipa na M-Pesa'" />
+          <Step number={3} text="Select 'Pay Bill'" />
+          <Step
+            number={4}
+            text={`Enter Business Number: ${params.paybill}`}
+            highlight={params.paybill}
+          />
+          <Step
+            number={5}
+            text={`Enter Account Number: ${params.accountNumber}`}
+            highlight={params.accountNumber}
+          />
+          <Step
+            number={6}
+            text={`Enter Amount: ${formatKES(parseFloat(params.amount || '0'))}`}
+            highlight={formatKES(parseFloat(params.amount || '0'))}
+          />
+          <Step number={7} text="Enter your M-Pesa PIN and confirm" />
+        </View>
+
+        <View style={styles.warningCard}>
+          <Ionicons name="alert-circle" size={24} color={COLORS.warning} />
+          <Text style={styles.warningText}>
+            Make sure to use your phone number ({params.accountNumber}) as the account
+            number for proper identification.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.confirmButton, confirming && styles.confirmButtonDisabled]}
+          onPress={handleConfirm}
+          disabled={confirming}
+        >
+          {confirming ? (
+            <ActivityIndicator color={COLORS.surface} />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.surface} />
+              <Text style={styles.confirmButtonText}>I've Made the Payment</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.footerNote}>
+          Click above after completing the M-Pesa payment to credit your account
+          (Demo: Payment is simulated)
+        </Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function Step({
+  number,
+  text,
+  highlight,
+}: {
+  number: number;
+  text: string;
+  highlight?: string;
+}) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepNumber}>
+        <Text style={styles.stepNumberText}>{number}</Text>
+      </View>
+      <Text style={styles.stepText}>{text}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  placeholder: {
+    width: 44,
+  },
+  content: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+  amountCard: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  amountLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  amountValue: {
+    fontSize: FONT_SIZES.hero,
+    fontWeight: '700',
+    color: COLORS.surface,
+    marginTop: SPACING.xs,
+  },
+  instructionsCard: {
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+  },
+  instructionsTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+  },
+  stepNumberText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.surface,
+  },
+  stepText: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7E6',
+    borderRadius: 12,
+    padding: SPACING.md,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    marginLeft: SPACING.sm,
+    lineHeight: 20,
+  },
+  footer: {
+    padding: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.success,
+    borderRadius: 12,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.7,
+  },
+  confirmButtonText: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    color: COLORS.surface,
+    marginLeft: SPACING.sm,
+  },
+  footerNote: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textLight,
+    textAlign: 'center',
+  },
+});
