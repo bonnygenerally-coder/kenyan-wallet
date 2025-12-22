@@ -66,9 +66,9 @@ export default function SignupScreen() {
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
+          </Pressable>
 
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
