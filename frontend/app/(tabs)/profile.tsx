@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
-  Alert,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,23 +16,12 @@ import { useAuthStore } from '@/src/store/authStore';
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/');
-          },
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    setShowLogoutModal(false);
+    await logout();
+    router.replace('/');
   };
 
   return (
@@ -102,26 +91,29 @@ export default function ProfileScreen() {
             <MenuItem
               icon="help-circle"
               label="Help & FAQ"
-              onPress={() => Alert.alert('Help', 'For support, call 0800 723 456')}
+              onPress={() => router.push('/faq')}
             />
             <MenuItem
               icon="document-text"
               label="Terms & Conditions"
-              onPress={() => Alert.alert('Terms', 'Visit our website for full terms')}
+              onPress={() => router.push('/terms')}
             />
             <MenuItem
               icon="lock-closed"
               label="Privacy Policy"
-              onPress={() => Alert.alert('Privacy', 'Visit our website for privacy policy')}
+              onPress={() => router.push('/privacy')}
             />
           </View>
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Pressable 
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]} 
+          onPress={() => setShowLogoutModal(true)}
+        >
           <Ionicons name="log-out" size={20} color={COLORS.error} />
           <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Disclaimer */}
         <Text style={styles.disclaimer}>
@@ -129,6 +121,36 @@ export default function ProfileScreen() {
           returns. Dolaglobo Finance MMF is regulated by the Capital Markets Authority.
         </Text>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="log-out-outline" size={48} color={COLORS.error} />
+            <Text style={styles.modalTitle}>Logout</Text>
+            <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleLogout}
+              >
+                <Text style={styles.confirmButtonText}>Logout</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -152,11 +174,11 @@ function MenuItem({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]} onPress={onPress}>
       <Ionicons name={icon as any} size={20} color={COLORS.textSecondary} />
       <Text style={styles.menuLabel}>{label}</Text>
       <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -295,6 +317,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  menuItemPressed: {
+    backgroundColor: COLORS.background,
+  },
   menuLabel: {
     flex: 1,
     fontSize: FONT_SIZES.md,
@@ -310,6 +335,9 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.lg,
   },
+  logoutButtonPressed: {
+    backgroundColor: '#FFEBE6',
+  },
   logoutText: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
@@ -322,5 +350,62 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: SPACING.xl,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: SPACING.md,
+  },
+  modalMessage: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: COLORS.background,
+    marginRight: SPACING.sm,
+  },
+  cancelButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  confirmButton: {
+    backgroundColor: COLORS.error,
+    marginLeft: SPACING.sm,
+  },
+  confirmButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.surface,
   },
 });
