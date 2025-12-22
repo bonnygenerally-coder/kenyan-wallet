@@ -148,8 +148,19 @@ export default function SignupScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={[styles.signupButton, loading && styles.signupButtonDisabled]}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.signupButton,
+                loading && styles.signupButtonDisabled,
+                pressed && styles.signupButtonPressed
+              ]}
               onPress={handleSignup}
               disabled={loading}
             >
@@ -158,16 +169,16 @@ export default function SignupScreen() {
               ) : (
                 <Text style={styles.signupButtonText}>Create Account</Text>
               )}
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
               style={styles.loginLink}
               onPress={() => router.push('/(auth)/login')}
             >
               <Text style={styles.loginText}>
                 Already have an account? <Text style={styles.loginTextBold}>Login</Text>
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
