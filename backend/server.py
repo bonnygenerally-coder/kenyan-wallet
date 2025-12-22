@@ -13,16 +13,34 @@ from datetime import datetime, timedelta
 import bcrypt
 from jose import jwt, JWTError
 
+# Load environment variables
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+env_path = ROOT_DIR / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'dolaglobo_mmf')]
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# MongoDB connection with Atlas support
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'dolaglobo_mmf')
+
+# Create MongoDB client with proper settings for Atlas
+client = AsyncIOMotorClient(
+    mongo_url,
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=10000,
+    socketTimeoutMS=10000,
+)
+db = client[db_name]
 
 # JWT Configuration
-SECRET_KEY = os.environ.get('JWT_SECRET', 'dolaglobo-secret-key-2024')
+SECRET_KEY = os.environ.get('JWT_SECRET', 'dolaglobo-secret-key-2024-prod')
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
