@@ -12,9 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '../../src/constants/theme';
-import { getAccount, calculateInterest, Account } from '../../src/utils/api';
-import { useAuthStore } from '../../src/store/authStore';
+import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { getAccount, calculateInterest, Account } from '@/src/utils/api';
+import { useAuthStore } from '@/src/store/authStore';
 
 export default function DashboardScreen() {
   const router = useRouter();

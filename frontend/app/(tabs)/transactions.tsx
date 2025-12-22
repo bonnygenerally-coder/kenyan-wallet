@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '../../src/constants/theme';
-import { getTransactions, Transaction } from '../../src/utils/api';
+import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { getTransactions, Transaction } from '@/src/utils/api';
 
 export default function TransactionsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

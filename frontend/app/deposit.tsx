@@ -13,8 +13,8 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '../src/constants/theme';
-import { createDeposit } from '../src/utils/api';
+import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { createDeposit } from '@/src/utils/api';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
 

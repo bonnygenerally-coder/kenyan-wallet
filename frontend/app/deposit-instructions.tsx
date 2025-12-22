@@ -10,8 +10,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '../src/constants/theme';
-import { confirmDeposit } from '../src/utils/api';
+import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { confirmDeposit } from '@/src/utils/api';
 
 export default function DepositInstructionsScreen() {
   const router = useRouter();
@@ -67,17 +67,14 @@ export default function DepositInstructionsScreen() {
           <Step
             number={4}
             text={`Enter Business Number: ${params.paybill}`}
-            highlight={params.paybill}
           />
           <Step
             number={5}
             text={`Enter Account Number: ${params.accountNumber}`}
-            highlight={params.accountNumber}
           />
           <Step
             number={6}
             text={`Enter Amount: ${formatKES(parseFloat(params.amount || '0'))}`}
-            highlight={formatKES(parseFloat(params.amount || '0'))}
           />
           <Step number={7} text="Enter your M-Pesa PIN and confirm" />
         </View>
@@ -119,11 +116,9 @@ export default function DepositInstructionsScreen() {
 function Step({
   number,
   text,
-  highlight,
 }: {
   number: number;
   text: string;
-  highlight?: string;
 }) {
   return (
     <View style={styles.step}>

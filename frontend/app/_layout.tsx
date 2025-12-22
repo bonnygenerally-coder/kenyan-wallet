@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useAuthStore } from '../src/store/authStore';
+import { useAuthStore } from '@/src/store/authStore';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { COLORS } from '../src/constants/theme';
+import { COLORS } from '@/src/constants/theme';
 
 export default function RootLayout() {
   const { isLoading, loadToken } = useAuthStore();
