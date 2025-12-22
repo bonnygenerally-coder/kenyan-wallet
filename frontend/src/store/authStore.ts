@@ -44,7 +44,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (phone: string, pin: string) => {
-    const response = await axios.post(`${API_URL}/api/auth/login`, { phone, pin });
+    // Normalize phone - add prefix if needed
+    let normalizedPhone = phone.trim();
+    if (!normalizedPhone.startsWith('+254') && !normalizedPhone.startsWith('0')) {
+      normalizedPhone = '0' + normalizedPhone;
+    }
+    const response = await axios.post(`${API_URL}/api/auth/login`, { phone: normalizedPhone, pin });
     const { access_token, user } = response.data;
     await AsyncStorage.setItem('auth_token', access_token);
     await AsyncStorage.setItem('user', JSON.stringify(user));
@@ -52,7 +57,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signup: async (phone: string, pin: string, name: string) => {
-    const response = await axios.post(`${API_URL}/api/auth/signup`, { phone, pin, name });
+    // Normalize phone - add prefix if needed
+    let normalizedPhone = phone.trim();
+    if (!normalizedPhone.startsWith('+254') && !normalizedPhone.startsWith('0')) {
+      normalizedPhone = '0' + normalizedPhone;
+    }
+    const response = await axios.post(`${API_URL}/api/auth/signup`, { phone: normalizedPhone, pin, name });
     const { access_token, user } = response.data;
     await AsyncStorage.setItem('auth_token', access_token);
     await AsyncStorage.setItem('user', JSON.stringify(user));
