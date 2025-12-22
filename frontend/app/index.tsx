@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../src/store/authStore';
-import { COLORS, SPACING, FONT_SIZES } from '../src/constants/theme';
+import { useAuthStore } from '@/src/store/authStore';
+import { COLORS, SPACING, FONT_SIZES } from '@/src/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function WelcomeScreen() {
