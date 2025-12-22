@@ -4,10 +4,9 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,11 +21,13 @@ export default function DepositScreen() {
   const router = useRouter();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleDeposit = async () => {
+    setError('');
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < 50) {
-      Alert.alert('Error', 'Minimum deposit is KES 50');
+      setError('Minimum deposit is KES 50');
       return;
     }
 
@@ -42,9 +43,9 @@ export default function DepositScreen() {
           accountNumber: response.account_number,
         },
       });
-    } catch (error: any) {
-      const message = error.response?.data?.detail || 'Failed to create deposit';
-      Alert.alert('Error', message);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Failed to create deposit';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -52,6 +53,7 @@ export default function DepositScreen() {
 
   const selectQuickAmount = (value: number) => {
     setAmount(value.toString());
+    setError('');
   };
 
   return (
@@ -61,9 +63,9 @@ export default function DepositScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <Pressable style={styles.closeButton} onPress={() => router.back()}>
             <Ionicons name="close" size={28} color={COLORS.text} />
-          </TouchableOpacity>
+          </Pressable>
           <Text style={styles.title}>Deposit</Text>
           <View style={styles.placeholder} />
         </View>
@@ -78,18 +80,22 @@ export default function DepositScreen() {
               placeholderTextColor={COLORS.textLight}
               keyboardType="number-pad"
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(text) => {
+                setAmount(text);
+                setError('');
+              }}
             />
           </View>
 
           <Text style={styles.quickLabel}>Quick Select</Text>
           <View style={styles.quickAmounts}>
             {QUICK_AMOUNTS.map((value) => (
-              <TouchableOpacity
+              <Pressable
                 key={value}
-                style={[
+                style={({ pressed }) => [
                   styles.quickButton,
                   amount === value.toString() && styles.quickButtonActive,
+                  pressed && styles.quickButtonPressed
                 ]}
                 onPress={() => selectQuickAmount(value)}
               >
@@ -101,9 +107,16 @@ export default function DepositScreen() {
                 >
                   {formatKES(value)}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
+
+          {error ? (
+            <View style={styles.errorCard}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.infoCard}>
             <Ionicons name="information-circle" size={24} color={COLORS.secondary} />
@@ -115,8 +128,12 @@ export default function DepositScreen() {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.depositButton, loading && styles.depositButtonDisabled]}
+          <Pressable
+            style={({ pressed }) => [
+              styles.depositButton,
+              loading && styles.depositButtonDisabled,
+              pressed && styles.depositButtonPressed
+            ]}
             onPress={handleDeposit}
             disabled={loading}
           >
@@ -128,7 +145,7 @@ export default function DepositScreen() {
                 <Text style={styles.depositButtonText}>Continue to M-Pesa</Text>
               </>
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -218,6 +235,9 @@ const styles = StyleSheet.create({
   quickButtonActive: {
     backgroundColor: COLORS.primary,
   },
+  quickButtonPressed: {
+    opacity: 0.8,
+  },
   quickButtonText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
@@ -225,6 +245,20 @@ const styles = StyleSheet.create({
   },
   quickButtonTextActive: {
     color: COLORS.surface,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBE6',
+    padding: SPACING.md,
+    borderRadius: 12,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginLeft: SPACING.sm,
   },
   infoCard: {
     flexDirection: 'row',
@@ -255,6 +289,9 @@ const styles = StyleSheet.create({
   },
   depositButtonDisabled: {
     opacity: 0.7,
+  },
+  depositButtonPressed: {
+    opacity: 0.9,
   },
   depositButtonText: {
     fontSize: FONT_SIZES.lg,
