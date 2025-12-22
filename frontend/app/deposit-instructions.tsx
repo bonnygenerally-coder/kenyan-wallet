@@ -3,9 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Alert,
+  Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,30 +22,34 @@ export default function DepositInstructionsScreen() {
     accountNumber: string;
   }>();
   const [confirming, setConfirming] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const handleConfirm = async () => {
     setConfirming(true);
+    setError('');
     try {
       await confirmDeposit(params.transactionId!);
-      Alert.alert(
-        'Success',
-        `Your deposit of ${formatKES(parseFloat(params.amount || '0'))} has been credited to your account!`,
-        [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-      );
-    } catch (error: any) {
-      const message = error.response?.data?.detail || 'Failed to confirm deposit';
-      Alert.alert('Error', message);
+      setShowSuccess(true);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Failed to confirm deposit';
+      setError(message);
     } finally {
       setConfirming(false);
     }
   };
 
+  const handleSuccessDismiss = () => {
+    setShowSuccess(false);
+    router.replace('/(tabs)');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+        <Pressable style={styles.closeButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.title}>M-Pesa Instructions</Text>
         <View style={styles.placeholder} />
       </View>
@@ -86,11 +90,22 @@ export default function DepositInstructionsScreen() {
             number for proper identification.
           </Text>
         </View>
+
+        {error ? (
+          <View style={styles.errorCard}>
+            <Ionicons name="close-circle" size={20} color={COLORS.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.confirmButton, confirming && styles.confirmButtonDisabled]}
+        <Pressable
+          style={({ pressed }) => [
+            styles.confirmButton,
+            confirming && styles.confirmButtonDisabled,
+            pressed && styles.confirmButtonPressed
+          ]}
           onPress={handleConfirm}
           disabled={confirming}
         >
@@ -102,13 +117,42 @@ export default function DepositInstructionsScreen() {
               <Text style={styles.confirmButtonText}>I've Made the Payment</Text>
             </>
           )}
-        </TouchableOpacity>
+        </Pressable>
 
         <Text style={styles.footerNote}>
           Click above after completing the M-Pesa payment to credit your account
           (Demo: Payment is simulated)
         </Text>
       </View>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccess}
+        transparent
+        animationType="fade"
+        onRequestClose={handleSuccessDismiss}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.successIcon}>
+              <Ionicons name="checkmark-circle" size={64} color={COLORS.success} />
+            </View>
+            <Text style={styles.modalTitle}>Deposit Successful!</Text>
+            <Text style={styles.modalAmount}>
+              {formatKES(parseFloat(params.amount || '0'))}
+            </Text>
+            <Text style={styles.modalMessage}>
+              has been credited to your account
+            </Text>
+            <Pressable
+              style={styles.modalButton}
+              onPress={handleSuccessDismiss}
+            >
+              <Text style={styles.modalButtonText}>Go to Dashboard</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -228,6 +272,20 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
     lineHeight: 20,
   },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBE6',
+    borderRadius: 12,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginLeft: SPACING.sm,
+  },
   footer: {
     padding: SPACING.lg,
     borderTopWidth: 1,
@@ -245,6 +303,9 @@ const styles = StyleSheet.create({
   confirmButtonDisabled: {
     opacity: 0.7,
   },
+  confirmButtonPressed: {
+    opacity: 0.9,
+  },
   confirmButtonText: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
@@ -255,5 +316,54 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textLight,
     textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+  },
+  successIcon: {
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  modalAmount: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '700',
+    color: COLORS.success,
+    marginTop: SPACING.sm,
+  },
+  modalMessage: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.lg,
+  },
+  modalButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.surface,
   },
 });
