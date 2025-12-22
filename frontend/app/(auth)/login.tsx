@@ -4,11 +4,10 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -24,14 +23,17 @@ export default function LoginScreen() {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
+    setError('');
+    
     if (!phone || phone.length < 9) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+      setError('Please enter a valid phone number');
       return;
     }
     if (pin.length !== 4) {
-      Alert.alert('Error', 'PIN must be 4 digits');
+      setError('PIN must be 4 digits');
       return;
     }
 
@@ -39,9 +41,9 @@ export default function LoginScreen() {
     try {
       await login(phone, pin);
       router.replace('/(tabs)');
-    } catch (error: any) {
-      const message = error.response?.data?.detail || 'Login failed. Please try again.';
-      Alert.alert('Error', message);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Login failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -54,9 +56,9 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
+          </Pressable>
 
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back</Text>
@@ -93,18 +95,29 @@ export default function LoginScreen() {
                   onChangeText={setPin}
                   maxLength={4}
                 />
-                <TouchableOpacity onPress={() => setShowPin(!showPin)}>
+                <Pressable onPress={() => setShowPin(!showPin)}>
                   <Ionicons
                     name={showPin ? 'eye-off' : 'eye'}
                     size={24}
                     color={COLORS.textSecondary}
                   />
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.loginButton,
+                loading && styles.loginButtonDisabled,
+                pressed && styles.loginButtonPressed
+              ]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -113,16 +126,16 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.loginButtonText}>Login</Text>
               )}
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
               style={styles.signupLink}
               onPress={() => router.push('/(auth)/signup')}
             >
               <Text style={styles.signupText}>
                 Don't have an account? <Text style={styles.signupTextBold}>Sign Up</Text>
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -205,6 +218,20 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: COLORS.text,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBE6',
+    padding: SPACING.md,
+    borderRadius: 12,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginLeft: SPACING.sm,
+  },
   loginButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
@@ -214,6 +241,9 @@ const styles = StyleSheet.create({
   },
   loginButtonDisabled: {
     opacity: 0.7,
+  },
+  loginButtonPressed: {
+    opacity: 0.9,
   },
   loginButtonText: {
     color: COLORS.surface,
