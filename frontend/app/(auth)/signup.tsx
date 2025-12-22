@@ -116,13 +116,13 @@ export default function SignupScreen() {
                   onChangeText={setPin}
                   maxLength={4}
                 />
-                <TouchableOpacity onPress={() => setShowPin(!showPin)}>
+                <Pressable onPress={() => setShowPin(!showPin)}>
                   <Ionicons
                     name={showPin ? 'eye-off' : 'eye'}
                     size={24}
                     color={COLORS.textSecondary}
                   />
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
 
