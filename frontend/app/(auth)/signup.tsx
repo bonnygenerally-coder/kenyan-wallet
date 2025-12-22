@@ -284,6 +284,20 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
     lineHeight: 18,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBE6',
+    padding: SPACING.md,
+    borderRadius: 12,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginLeft: SPACING.sm,
+  },
   signupButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
@@ -293,6 +307,9 @@ const styles = StyleSheet.create({
   },
   signupButtonDisabled: {
     opacity: 0.7,
+  },
+  signupButtonPressed: {
+    opacity: 0.9,
   },
   signupButtonText: {
     color: COLORS.surface,
