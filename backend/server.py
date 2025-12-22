@@ -412,10 +412,22 @@ async def get_profile(user = Depends(get_current_user)):
         created_at=user["created_at"]
     )
 
-# Health check
+# Health check with database connectivity test
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Dolaglobo Finance MMF"}
+    try:
+        # Test database connectivity
+        await db.command('ping')
+        db_status = "connected"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        db_status = "disconnected"
+    
+    return {
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "service": "Dolaglobo Finance MMF",
+        "database": db_status
+    }
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -428,13 +440,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+@app.on_event("startup")
+async def startup_db_client():
+    try:
+        # Test database connection on startup
+        await db.command('ping')
+        logger.info("Successfully connected to MongoDB")
+    except Exception as e:
+        logger.error(f"Failed to connect to MongoDB: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    logger.info("MongoDB connection closed")
