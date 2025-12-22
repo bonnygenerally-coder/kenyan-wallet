@@ -30,6 +30,9 @@ export default function RootLayout() {
         <Stack.Screen name="deposit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="withdraw" options={{ presentation: 'modal' }} />
         <Stack.Screen name="deposit-instructions" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="faq" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );
