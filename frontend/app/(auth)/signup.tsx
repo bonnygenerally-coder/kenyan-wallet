@@ -4,11 +4,10 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -26,22 +25,25 @@ export default function SignupScreen() {
   const [confirmPin, setConfirmPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSignup = async () => {
+    setError('');
+    
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      setError('Please enter your name');
       return;
     }
     if (!phone || phone.length < 9) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+      setError('Please enter a valid phone number');
       return;
     }
     if (pin.length !== 4) {
-      Alert.alert('Error', 'PIN must be 4 digits');
+      setError('PIN must be 4 digits');
       return;
     }
     if (pin !== confirmPin) {
-      Alert.alert('Error', 'PINs do not match');
+      setError('PINs do not match');
       return;
     }
 
@@ -49,9 +51,9 @@ export default function SignupScreen() {
     try {
       await signup(phone, pin, name.trim());
       router.replace('/(tabs)');
-    } catch (error: any) {
-      const message = error.response?.data?.detail || 'Signup failed. Please try again.';
-      Alert.alert('Error', message);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Signup failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
