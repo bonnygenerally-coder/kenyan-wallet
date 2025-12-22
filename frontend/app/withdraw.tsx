@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,44 +21,52 @@ export default function WithdrawScreen() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [error, setError] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [withdrawnAmount, setWithdrawnAmount] = useState(0);
+  const [destination, setDestination] = useState('');
 
   useEffect(() => {
     const fetchBalance = async () => {
       try {
         const account = await getAccount();
         setBalance(account.balance);
-      } catch (error) {
-        console.error('Failed to fetch balance:', error);
+      } catch (err) {
+        console.error('Failed to fetch balance:', err);
       }
     };
     fetchBalance();
   }, []);
 
   const handleWithdraw = async () => {
+    setError('');
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < 50) {
-      Alert.alert('Error', 'Minimum withdrawal is KES 50');
+      setError('Minimum withdrawal is KES 50');
       return;
     }
     if (numAmount > balance) {
-      Alert.alert('Error', 'Insufficient balance');
+      setError('Insufficient balance');
       return;
     }
 
     setLoading(true);
     try {
       const response = await createWithdrawal(numAmount);
-      Alert.alert(
-        'Success',
-        response.message,
-        [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-      );
-    } catch (error: any) {
-      const message = error.response?.data?.detail || 'Failed to process withdrawal';
-      Alert.alert('Error', message);
+      setWithdrawnAmount(response.amount);
+      setDestination(response.destination);
+      setShowSuccess(true);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Failed to process withdrawal';
+      setError(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessDismiss = () => {
+    setShowSuccess(false);
+    router.replace('/(tabs)');
   };
 
   const handleWithdrawAll = () => {
@@ -74,9 +82,9 @@ export default function WithdrawScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <Pressable style={styles.closeButton} onPress={() => router.back()}>
             <Ionicons name="close" size={28} color={COLORS.text} />
-          </TouchableOpacity>
+          </Pressable>
           <Text style={styles.title}>Withdraw</Text>
           <View style={styles.placeholder} />
         </View>
@@ -100,9 +108,16 @@ export default function WithdrawScreen() {
             />
           </View>
 
-          <TouchableOpacity style={styles.withdrawAllButton} onPress={handleWithdrawAll}>
+          <Pressable style={styles.withdrawAllButton} onPress={handleWithdrawAll}>
             <Text style={styles.withdrawAllText}>Withdraw All</Text>
-          </TouchableOpacity>
+          </Pressable>
+
+          {error ? (
+            <View style={styles.errorCard}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.infoCard}>
             <Ionicons name="flash" size={24} color={COLORS.success} />
@@ -117,8 +132,12 @@ export default function WithdrawScreen() {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.withdrawButton, loading && styles.withdrawButtonDisabled]}
+          <Pressable
+            style={({ pressed }) => [
+              styles.withdrawButton,
+              loading && styles.withdrawButtonDisabled,
+              pressed && styles.withdrawButtonPressed
+            ]}
             onPress={handleWithdraw}
             disabled={loading}
           >
@@ -132,9 +151,34 @@ export default function WithdrawScreen() {
                 </Text>
               </>
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccess}
+        transparent
+        animationType="fade"
+        onRequestClose={handleSuccessDismiss}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.successIcon}>
+              <Ionicons name="checkmark-circle" size={64} color={COLORS.success} />
+            </View>
+            <Text style={styles.modalTitle}>Withdrawal Successful!</Text>
+            <Text style={styles.modalAmount}>{formatKES(withdrawnAmount)}</Text>
+            <Text style={styles.modalMessage}>sent to {destination}</Text>
+            <Pressable
+              style={styles.modalButton}
+              onPress={handleSuccessDismiss}
+            >
+              <Text style={styles.modalButtonText}>Go to Dashboard</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -226,6 +270,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBE6',
+    padding: SPACING.md,
+    borderRadius: 12,
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginLeft: SPACING.sm,
+  },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -264,10 +322,62 @@ const styles = StyleSheet.create({
   withdrawButtonDisabled: {
     opacity: 0.7,
   },
+  withdrawButtonPressed: {
+    opacity: 0.9,
+  },
   withdrawButtonText: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.surface,
     marginLeft: SPACING.sm,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+  },
+  successIcon: {
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  modalAmount: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '700',
+    color: COLORS.success,
+    marginTop: SPACING.sm,
+  },
+  modalMessage: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.lg,
+  },
+  modalButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.surface,
   },
 });
