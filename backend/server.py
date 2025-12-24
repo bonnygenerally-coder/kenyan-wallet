@@ -502,6 +502,80 @@ async def get_transactions(user = Depends(get_current_user)):
 # Interest calculation is now admin-only - see /api/admin/distribute-interest
 # Customers can only view their estimated interest on the account endpoint
 
+# ============== CUSTOMER STATEMENT REQUESTS ==============
+@api_router.post("/statements/request")
+async def request_statement(request: StatementRequest, user = Depends(get_current_user)):
+    """Customer requests an account statement for 1-12 months"""
+    if request.months < 1 or request.months > 12:
+        raise HTTPException(status_code=400, detail="Months must be between 1 and 12")
+    
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=request.months * 30)
+    
+    statement_request = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "months": request.months,
+        "start_date": start_date,
+        "end_date": end_date,
+        "status": "pending",
+        "email": request.email or None,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    await db.statement_requests.insert_one(statement_request)
+    
+    return {
+        "message": "Statement request submitted successfully",
+        "request_id": statement_request["id"],
+        "months": request.months,
+        "status": "pending",
+        "note": "Your statement will be generated and sent within 24-48 hours"
+    }
+
+@api_router.get("/statements/requests")
+async def get_my_statement_requests(user = Depends(get_current_user)):
+    """Get all statement requests for the current user"""
+    requests = await db.statement_requests.find(
+        {"user_id": user["id"]}
+    ).sort("created_at", -1).to_list(50)
+    
+    return [{
+        "id": r["id"],
+        "months": r["months"],
+        "start_date": r["start_date"],
+        "end_date": r["end_date"],
+        "status": r["status"],
+        "email": r.get("email"),
+        "created_at": r["created_at"],
+        "sent_at": r.get("sent_at"),
+        "admin_note": r.get("admin_note")
+    } for r in requests]
+
+@api_router.get("/statements/request/{request_id}")
+async def get_statement_request_status(request_id: str, user = Depends(get_current_user)):
+    """Get status of a specific statement request"""
+    request = await db.statement_requests.find_one({
+        "id": request_id,
+        "user_id": user["id"]
+    })
+    
+    if not request:
+        raise HTTPException(status_code=404, detail="Statement request not found")
+    
+    return {
+        "id": request["id"],
+        "months": request["months"],
+        "start_date": request["start_date"],
+        "end_date": request["end_date"],
+        "status": request["status"],
+        "email": request.get("email"),
+        "created_at": request["created_at"],
+        "sent_at": request.get("sent_at"),
+        "admin_note": request.get("admin_note")
+    }
+
 @api_router.get("/user/profile")
 async def get_profile(user = Depends(get_current_user)):
     return UserResponse(
