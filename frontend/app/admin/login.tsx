@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAdminStore } from '@/src/store/adminStore';
-import { COLORS, SPACING, FONT_SIZES } from '@/src/constants/theme';
+import { ADMIN_COLORS as COLORS, SPACING, FONT_SIZES } from '@/src/constants/theme';
 
 export default function AdminLoginScreen() {
   const router = useRouter();
