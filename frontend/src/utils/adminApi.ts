@@ -194,4 +194,54 @@ export const distributeInterestToCustomer = async (customerId: string, customRat
   return response.data;
 };
 
+// ============== STATEMENT MANAGEMENT APIs ==============
+export interface StatementRequest {
+  id: string;
+  user_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_balance: number;
+  months: number;
+  start_date: string;
+  end_date: string;
+  status: string;
+  email?: string;
+  created_at: string;
+  processed_by?: string;
+  processed_at?: string;
+  sent_at?: string;
+  admin_note?: string;
+}
+
+export const getStatementRequests = async (page = 1, limit = 20, status?: string) => {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.append('status', status);
+  const response = await adminApi.get(`/statements?${params}`);
+  return response.data;
+};
+
+export const getPendingStatements = async () => {
+  const response = await adminApi.get('/statements/pending');
+  return response.data;
+};
+
+export const getStatementDetail = async (requestId: string) => {
+  const response = await adminApi.get(`/statements/${requestId}`);
+  return response.data;
+};
+
+export const processStatementRequest = async (
+  requestId: string,
+  action: 'process' | 'complete' | 'send' | 'reject',
+  note?: string,
+  emailSentTo?: string
+) => {
+  const response = await adminApi.post(`/statements/${requestId}/action`, {
+    action,
+    note,
+    email_sent_to: emailSentTo
+  });
+  return response.data;
+};
+
 export default adminApi;
