@@ -150,4 +150,32 @@ export const getAuditLogs = async (page = 1, limit = 50) => {
   return response.data;
 };
 
+// ============== NEW VERIFICATION APIs ==============
+
+export const getPendingVerifications = async (page = 1, limit = 20) => {
+  const response = await adminApi.get(`/pending-verifications?page=${page}&limit=${limit}`);
+  return response.data;
+};
+
+export const verifyDeposit = async (transactionId: string, approve: boolean, note?: string) => {
+  const params = new URLSearchParams({ approve: String(approve) });
+  if (note) params.append('note', note);
+  const response = await adminApi.post(`/transactions/${transactionId}/verify?${params}`);
+  return response.data;
+};
+
+export const adjustCustomerBalance = async (
+  customerId: string,
+  amount: number,
+  type: 'credit' | 'debit',
+  reason: string
+) => {
+  const response = await adminApi.post(`/customers/${customerId}/adjust-balance`, {
+    amount,
+    type,
+    reason
+  });
+  return response.data;
+};
+
 export default adminApi;
