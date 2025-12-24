@@ -125,7 +125,7 @@ export default function DepositInstructionsScreen() {
         </Text>
       </View>
 
-      {/* Success Modal */}
+      {/* Success Modal - Now shows pending verification */}
       <Modal
         visible={showSuccess}
         transparent
@@ -134,16 +134,22 @@ export default function DepositInstructionsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.successIcon}>
-              <Ionicons name="checkmark-circle" size={64} color={COLORS.success} />
+            <View style={styles.pendingIcon}>
+              <Ionicons name="time" size={64} color="#FF9800" />
             </View>
-            <Text style={styles.modalTitle}>Deposit Successful!</Text>
+            <Text style={styles.modalTitle}>Payment Received!</Text>
             <Text style={styles.modalAmount}>
               {formatKES(parseFloat(params.amount || '0'))}
             </Text>
             <Text style={styles.modalMessage}>
-              has been credited to your account
+              Awaiting admin verification
             </Text>
+            <View style={styles.pendingInfo}>
+              <Ionicons name="information-circle" size={18} color={COLORS.textSecondary} />
+              <Text style={styles.pendingInfoText}>
+                Your deposit will reflect in your account once verified by admin (usually within 24 hours)
+              </Text>
+            </View>
             <Pressable
               style={styles.modalButton}
               onPress={handleSuccessDismiss}
