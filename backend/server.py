@@ -933,6 +933,174 @@ async def adjust_customer_balance(
         "transaction_id": transaction["id"]
     }
 
+# ============== ADMIN INTEREST DISTRIBUTION ==============
+class InterestDistribution(BaseModel):
+    customer_id: Optional[str] = None  # If None, distribute to all customers
+    custom_rate: Optional[float] = None  # Override daily rate if provided
+
+@admin_router.post("/distribute-interest")
+async def distribute_interest(
+    distribution: InterestDistribution = None,
+    admin = Depends(require_role([AdminRole.SUPER_ADMIN]))
+):
+    """
+    Distribute daily interest to customers.
+    Super Admin only.
+    - If customer_id is provided, distribute only to that customer
+    - If customer_id is None, distribute to ALL customers with positive balance
+    - Uses daily rate (15% annual / 365 days) unless custom_rate is provided
+    """
+    daily_rate = DAILY_INTEREST_RATE
+    if distribution and distribution.custom_rate:
+        daily_rate = distribution.custom_rate
+    
+    results = {
+        "total_distributed": 0,
+        "customers_credited": 0,
+        "transactions": []
+    }
+    
+    # Build query
+    if distribution and distribution.customer_id:
+        # Single customer
+        accounts = await db.accounts.find({
+            "user_id": distribution.customer_id,
+            "balance": {"$gt": 0}
+        }).to_list(1)
+    else:
+        # All customers with positive balance
+        accounts = await db.accounts.find({"balance": {"$gt": 0}}).to_list(1000)
+    
+    for account in accounts:
+        interest = account["balance"] * daily_rate
+        
+        if interest <= 0:
+            continue
+        
+        # Update account
+        await db.accounts.update_one(
+            {"user_id": account["user_id"]},
+            {
+                "$inc": {"balance": interest, "total_interest_earned": interest},
+                "$set": {"last_interest_date": datetime.utcnow()}
+            }
+        )
+        
+        # Create transaction record
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "user_id": account["user_id"],
+            "type": "interest",
+            "amount": interest,
+            "status": "completed",
+            "description": f"Daily interest ({daily_rate * 365 * 100:.1f}% p.a.)",
+            "created_at": datetime.utcnow(),
+            "distributed_by": admin["id"]
+        }
+        await db.transactions.insert_one(transaction)
+        
+        results["total_distributed"] += interest
+        results["customers_credited"] += 1
+        results["transactions"].append({
+            "user_id": account["user_id"],
+            "interest": interest,
+            "new_balance": account["balance"] + interest
+        })
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="distribute_interest",
+        target_type="system",
+        target_id="all" if not (distribution and distribution.customer_id) else distribution.customer_id,
+        details={
+            "daily_rate": daily_rate,
+            "annual_rate": daily_rate * 365,
+            "total_distributed": results["total_distributed"],
+            "customers_credited": results["customers_credited"]
+        }
+    )
+    
+    return {
+        "message": f"Interest distributed to {results['customers_credited']} customer(s)",
+        "total_distributed": results["total_distributed"],
+        "customers_credited": results["customers_credited"],
+        "daily_rate": daily_rate,
+        "annual_rate": daily_rate * 365
+    }
+
+@admin_router.post("/distribute-interest/{customer_id}")
+async def distribute_interest_to_customer(
+    customer_id: str,
+    custom_rate: Optional[float] = None,
+    admin = Depends(require_role([AdminRole.TRANSACTION_MANAGER, AdminRole.SUPER_ADMIN]))
+):
+    """
+    Distribute interest to a specific customer.
+    Transaction Manager or Super Admin.
+    """
+    user = await db.users.find_one({"id": customer_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    account = await db.accounts.find_one({"user_id": customer_id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    if account["balance"] <= 0:
+        raise HTTPException(status_code=400, detail="Customer has no balance to earn interest")
+    
+    daily_rate = custom_rate if custom_rate else DAILY_INTEREST_RATE
+    interest = account["balance"] * daily_rate
+    
+    # Update account
+    await db.accounts.update_one(
+        {"user_id": customer_id},
+        {
+            "$inc": {"balance": interest, "total_interest_earned": interest},
+            "$set": {"last_interest_date": datetime.utcnow()}
+        }
+    )
+    
+    # Create transaction record
+    transaction = {
+        "id": str(uuid.uuid4()),
+        "user_id": customer_id,
+        "type": "interest",
+        "amount": interest,
+        "status": "completed",
+        "description": f"Daily interest ({daily_rate * 365 * 100:.1f}% p.a.)",
+        "created_at": datetime.utcnow(),
+        "distributed_by": admin["id"]
+    }
+    await db.transactions.insert_one(transaction)
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="distribute_interest",
+        target_type="customer",
+        target_id=customer_id,
+        details={
+            "daily_rate": daily_rate,
+            "interest_amount": interest,
+            "customer_name": user["name"],
+            "old_balance": account["balance"],
+            "new_balance": account["balance"] + interest
+        }
+    )
+    
+    return {
+        "message": f"Interest distributed to {user['name']}",
+        "customer_id": customer_id,
+        "customer_name": user["name"],
+        "interest": interest,
+        "new_balance": account["balance"] + interest,
+        "daily_rate": daily_rate
+    }
+
 # ============== ADMIN PENDING VERIFICATIONS ==============
 @admin_router.get("/pending-verifications")
 async def get_pending_verifications(
