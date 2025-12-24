@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES } from '@/src/constants/theme';
+import { ADMIN_COLORS as COLORS, SPACING, FONT_SIZES } from '@/src/constants/theme';
 import { getAuditLogs, AuditLog } from '@/src/utils/adminApi';
 import { useAdminStore } from '@/src/store/adminStore';
 
