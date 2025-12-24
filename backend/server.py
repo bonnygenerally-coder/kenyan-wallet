@@ -609,8 +609,13 @@ async def get_dashboard_stats(admin = Depends(get_current_admin)):
     # Active customers (with balance > 0)
     active_customers = await db.accounts.count_documents({"balance": {"$gt": 0}})
     
-    # Pending transactions
-    pending_transactions = await db.transactions.count_documents({"status": "pending"})
+    # Pending transactions (both pending and pending_verification)
+    pending_transactions = await db.transactions.count_documents({
+        "status": {"$in": ["pending", "pending_verification"]}
+    })
+    
+    # Pending verifications (deposits awaiting admin approval)
+    pending_verifications = await db.transactions.count_documents({"status": "pending_verification"})
     
     # Today's transactions
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
