@@ -184,6 +184,18 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textLight,
     textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  adminLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
     marginBottom: SPACING.lg,
+  },
+  adminLinkText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textLight,
+    marginLeft: SPACING.xs,
   },
 });
