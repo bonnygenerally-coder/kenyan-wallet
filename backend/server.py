@@ -1197,6 +1197,208 @@ async def distribute_interest_to_customer(
         "daily_rate": daily_rate
     }
 
+# ============== ADMIN STATEMENT REQUESTS ==============
+@admin_router.get("/statements")
+async def get_all_statement_requests(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    admin = Depends(get_current_admin)
+):
+    """Get all statement requests for admin review"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    total = await db.statement_requests.count_documents(query)
+    skip = (page - 1) * limit
+    
+    requests = await db.statement_requests.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Enrich with user data
+    enriched = []
+    for r in requests:
+        user = await db.users.find_one({"id": r["user_id"]})
+        account = await db.accounts.find_one({"user_id": r["user_id"]})
+        enriched.append({
+            "id": r["id"],
+            "user_id": r["user_id"],
+            "customer_name": user["name"] if user else "Unknown",
+            "customer_phone": user["phone"] if user else "Unknown",
+            "customer_balance": account["balance"] if account else 0,
+            "months": r["months"],
+            "start_date": r["start_date"],
+            "end_date": r["end_date"],
+            "status": r["status"],
+            "email": r.get("email"),
+            "created_at": r["created_at"],
+            "processed_by": r.get("processed_by"),
+            "processed_at": r.get("processed_at"),
+            "sent_at": r.get("sent_at"),
+            "admin_note": r.get("admin_note")
+        })
+    
+    return {
+        "requests": enriched,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+@admin_router.get("/statements/pending")
+async def get_pending_statement_requests(admin = Depends(get_current_admin)):
+    """Get count and list of pending statement requests"""
+    pending_count = await db.statement_requests.count_documents({"status": "pending"})
+    processing_count = await db.statement_requests.count_documents({"status": "processing"})
+    
+    pending = await db.statement_requests.find({"status": "pending"}).sort("created_at", 1).limit(10).to_list(10)
+    
+    enriched = []
+    for r in pending:
+        user = await db.users.find_one({"id": r["user_id"]})
+        enriched.append({
+            "id": r["id"],
+            "customer_name": user["name"] if user else "Unknown",
+            "customer_phone": user["phone"] if user else "Unknown",
+            "months": r["months"],
+            "created_at": r["created_at"]
+        })
+    
+    return {
+        "pending_count": pending_count,
+        "processing_count": processing_count,
+        "pending_requests": enriched
+    }
+
+@admin_router.get("/statements/{request_id}")
+async def get_statement_request_detail(request_id: str, admin = Depends(get_current_admin)):
+    """Get details of a specific statement request including transaction data"""
+    request = await db.statement_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Statement request not found")
+    
+    user = await db.users.find_one({"id": request["user_id"]})
+    account = await db.accounts.find_one({"user_id": request["user_id"]})
+    
+    # Get transactions for the period
+    transactions = await db.transactions.find({
+        "user_id": request["user_id"],
+        "created_at": {"$gte": request["start_date"], "$lte": request["end_date"]}
+    }).sort("created_at", -1).to_list(1000)
+    
+    # Calculate summary
+    deposits = sum(t["amount"] for t in transactions if t["type"] == "deposit" and t["status"] == "completed")
+    withdrawals = sum(t["amount"] for t in transactions if t["type"] == "withdrawal" and t["status"] == "completed")
+    interest = sum(t["amount"] for t in transactions if t["type"] == "interest")
+    
+    return {
+        "request": {
+            "id": request["id"],
+            "months": request["months"],
+            "start_date": request["start_date"],
+            "end_date": request["end_date"],
+            "status": request["status"],
+            "email": request.get("email"),
+            "created_at": request["created_at"]
+        },
+        "customer": {
+            "id": user["id"] if user else None,
+            "name": user["name"] if user else "Unknown",
+            "phone": user["phone"] if user else "Unknown",
+            "current_balance": account["balance"] if account else 0,
+            "total_interest_earned": account["total_interest_earned"] if account else 0
+        },
+        "summary": {
+            "total_deposits": deposits,
+            "total_withdrawals": withdrawals,
+            "total_interest": interest,
+            "net_change": deposits - withdrawals + interest,
+            "transaction_count": len(transactions)
+        },
+        "transactions": [{
+            "id": t["id"],
+            "type": t["type"],
+            "amount": t["amount"],
+            "status": t["status"],
+            "description": t.get("description", ""),
+            "created_at": t["created_at"]
+        } for t in transactions]
+    }
+
+class StatementAction(BaseModel):
+    action: str  # "process", "complete", "send", "reject"
+    note: Optional[str] = None
+    email_sent_to: Optional[str] = None
+
+@admin_router.post("/statements/{request_id}/action")
+async def process_statement_request(
+    request_id: str,
+    action_data: StatementAction,
+    admin = Depends(require_role([AdminRole.TRANSACTION_MANAGER, AdminRole.SUPER_ADMIN]))
+):
+    """Process a statement request (mark as processing, complete, send, or reject)"""
+    request = await db.statement_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Statement request not found")
+    
+    valid_actions = ["process", "complete", "send", "reject"]
+    if action_data.action not in valid_actions:
+        raise HTTPException(status_code=400, detail=f"Invalid action. Must be one of: {valid_actions}")
+    
+    update_data = {
+        "updated_at": datetime.utcnow(),
+        "processed_by": admin["id"],
+        "admin_name": admin["name"]
+    }
+    
+    if action_data.action == "process":
+        update_data["status"] = "processing"
+        update_data["processed_at"] = datetime.utcnow()
+        message = "Statement request marked as processing"
+    elif action_data.action == "complete":
+        update_data["status"] = "completed"
+        update_data["completed_at"] = datetime.utcnow()
+        message = "Statement marked as completed"
+    elif action_data.action == "send":
+        update_data["status"] = "sent"
+        update_data["sent_at"] = datetime.utcnow()
+        update_data["email_sent_to"] = action_data.email_sent_to or request.get("email")
+        message = f"Statement sent to customer"
+    elif action_data.action == "reject":
+        update_data["status"] = "rejected"
+        update_data["rejected_at"] = datetime.utcnow()
+        message = "Statement request rejected"
+    
+    if action_data.note:
+        update_data["admin_note"] = action_data.note
+    
+    await db.statement_requests.update_one(
+        {"id": request_id},
+        {"$set": update_data}
+    )
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action=f"statement_{action_data.action}",
+        target_type="statement_request",
+        target_id=request_id,
+        details={
+            "action": action_data.action,
+            "customer_id": request["user_id"],
+            "months": request["months"],
+            "note": action_data.note
+        }
+    )
+    
+    return {
+        "message": message,
+        "request_id": request_id,
+        "new_status": update_data["status"]
+    }
+
 # ============== ADMIN PENDING VERIFICATIONS ==============
 @admin_router.get("/pending-verifications")
 async def get_pending_verifications(
