@@ -17,6 +17,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', icon: 'grid', route: '/admin' },
   { label: 'Verifications', icon: 'checkmark-circle', route: '/admin/verifications', badge: true },
+  { label: 'Statements', icon: 'document-text', route: '/admin/statements' },
   { label: 'Interest', icon: 'trending-up', route: '/admin/interest' },
   { label: 'Transactions', icon: 'swap-horizontal', route: '/admin/transactions' },
   { label: 'Customers', icon: 'people', route: '/admin/customers' },
