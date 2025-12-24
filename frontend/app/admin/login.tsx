@@ -155,7 +155,7 @@ export default function AdminLoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1f36',
+    backgroundColor: COLORS.sidebar,
   },
   content: {
     flex: 1,
