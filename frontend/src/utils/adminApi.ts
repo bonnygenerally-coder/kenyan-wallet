@@ -20,6 +20,7 @@ export interface DashboardStats {
   total_customers: number;
   active_customers: number;
   pending_transactions: number;
+  pending_verifications: number;
   daily_deposits: number;
   daily_withdrawals: number;
   total_interest_paid: number;
