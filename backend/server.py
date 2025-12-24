@@ -363,6 +363,7 @@ async def create_deposit(deposit: DepositRequest, user = Depends(get_current_use
 
 @api_router.post("/deposit/confirm/{transaction_id}")
 async def confirm_deposit(transaction_id: str, user = Depends(get_current_user)):
+    """Customer confirms they've made M-Pesa payment - sets to pending_verification for admin approval"""
     transaction = await db.transactions.find_one({
         "id": transaction_id,
         "user_id": user["id"],
@@ -373,22 +374,49 @@ async def confirm_deposit(transaction_id: str, user = Depends(get_current_user))
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
+    # Set to pending_verification - admin must approve before balance is credited
     await db.transactions.update_one(
         {"id": transaction_id},
-        {"$set": {"status": "completed", "completed_at": datetime.utcnow()}}
+        {"$set": {
+            "status": "pending_verification",
+            "customer_confirmed_at": datetime.utcnow(),
+            "mpesa_confirmation": True
+        }}
     )
-    
-    await db.accounts.update_one(
-        {"user_id": user["id"]},
-        {"$inc": {"balance": transaction["amount"]}}
-    )
-    
-    account = await db.accounts.find_one({"user_id": user["id"]})
     
     return {
-        "message": "Deposit confirmed successfully",
+        "message": "Payment confirmation received. Awaiting admin verification.",
+        "status": "pending_verification",
         "amount": transaction["amount"],
-        "new_balance": account["balance"]
+        "note": "Your deposit will reflect in your account once verified by admin (usually within 24 hours)."
+    }
+
+@api_router.get("/deposit/status/{transaction_id}")
+async def get_deposit_status(transaction_id: str, user = Depends(get_current_user)):
+    """Check deposit verification status"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "user_id": user["id"],
+        "type": "deposit"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    status_messages = {
+        "pending": "Waiting for your M-Pesa confirmation",
+        "pending_verification": "Payment received, awaiting admin verification",
+        "completed": "Deposit verified and credited to your account",
+        "failed": "Deposit verification failed",
+        "cancelled": "Deposit was cancelled"
+    }
+    
+    return {
+        "transaction_id": transaction["id"],
+        "status": transaction["status"],
+        "message": status_messages.get(transaction["status"], "Unknown status"),
+        "amount": transaction["amount"],
+        "created_at": transaction["created_at"]
     }
 
 @api_router.post("/withdraw")
