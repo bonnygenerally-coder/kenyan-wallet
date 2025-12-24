@@ -167,6 +167,7 @@ export default function AdminLayout() {
         >
           <Stack.Screen name="index" />
           <Stack.Screen name="verifications" />
+          <Stack.Screen name="statements" />
           <Stack.Screen name="interest" />
           <Stack.Screen name="transactions" />
           <Stack.Screen name="customers" />
