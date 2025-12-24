@@ -14,6 +14,27 @@ export const COLORS = {
   accent: '#36B37E',
 };
 
+// Admin-specific red theme colors
+export const ADMIN_COLORS = {
+  primary: '#DC2626',      // Admin red
+  primaryDark: '#B91C1C',
+  primaryLight: '#FEE2E2',
+  secondary: '#EF4444',
+  accent: '#F87171',
+  sidebar: '#1F1F1F',      // Dark sidebar
+  sidebarText: '#FFFFFF',
+  sidebarActive: '#DC2626',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  background: '#F9FAFB',
+  surface: '#FFFFFF',
+  text: '#111827',
+  textSecondary: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E5E7EB',
+};
+
 export const FONTS = {
   regular: 'System',
   medium: 'System',
