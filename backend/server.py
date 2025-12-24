@@ -173,6 +173,28 @@ class AuditLogEntry(BaseModel):
     details: dict
     timestamp: datetime
 
+# Statement Request Models
+class StatementStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    SENT = "sent"
+    REJECTED = "rejected"
+
+class StatementRequest(BaseModel):
+    months: int = Field(..., ge=1, le=12, description="Number of months (1-12)")
+    email: Optional[str] = None  # Optional email to send statement to
+
+class StatementRequestResponse(BaseModel):
+    id: str
+    user_id: str
+    months: int
+    start_date: datetime
+    end_date: datetime
+    status: str
+    email: Optional[str]
+    created_at: datetime
+
 # Helper Functions
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
