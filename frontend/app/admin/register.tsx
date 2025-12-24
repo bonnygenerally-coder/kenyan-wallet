@@ -189,7 +189,7 @@ export default function AdminRegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1f36',
+    backgroundColor: COLORS.sidebar,
   },
   scrollContent: {
     flexGrow: 1,
