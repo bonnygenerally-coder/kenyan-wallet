@@ -158,6 +158,7 @@ class DashboardStats(BaseModel):
     total_customers: int
     active_customers: int
     pending_transactions: int
+    pending_verifications: int
     daily_deposits: float
     daily_withdrawals: float
     total_interest_paid: float
