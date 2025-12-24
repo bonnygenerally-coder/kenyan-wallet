@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { ADMIN_COLORS as COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
 import { getTransactions, Transaction } from '@/src/utils/adminApi';
 
 const STATUS_OPTIONS = ['all', 'pending', 'processing', 'completed', 'failed', 'cancelled'];
