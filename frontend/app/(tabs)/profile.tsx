@@ -86,6 +86,18 @@ export default function ProfileScreen() {
 
         {/* Menu Items */}
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.menuCard}>
+            <MenuItem
+              icon="document-text"
+              label="Request Statement"
+              onPress={() => router.push('/statements')}
+            />
+          </View>
+        </View>
+
+        {/* Support Menu */}
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
           <View style={styles.menuCard}>
             <MenuItem
