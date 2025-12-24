@@ -477,41 +477,8 @@ async def get_transactions(user = Depends(get_current_user)):
         created_at=t["created_at"]
     ) for t in transactions]
 
-@api_router.post("/interest/calculate")
-async def calculate_interest(user = Depends(get_current_user)):
-    account = await db.accounts.find_one({"user_id": user["id"]})
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    
-    if account["balance"] <= 0:
-        return {"message": "No balance to earn interest", "interest": 0}
-    
-    interest = account["balance"] * DAILY_INTEREST_RATE
-    
-    await db.accounts.update_one(
-        {"user_id": user["id"]},
-        {
-            "$inc": {"balance": interest, "total_interest_earned": interest},
-            "$set": {"last_interest_date": datetime.utcnow()}
-        }
-    )
-    
-    transaction = {
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "type": "interest",
-        "amount": interest,
-        "status": "completed",
-        "description": "Daily interest earned",
-        "created_at": datetime.utcnow()
-    }
-    await db.transactions.insert_one(transaction)
-    
-    return {
-        "message": "Interest credited",
-        "interest": interest,
-        "new_balance": account["balance"] + interest
-    }
+# Interest calculation is now admin-only - see /api/admin/distribute-interest
+# Customers can only view their estimated interest on the account endpoint
 
 @api_router.get("/user/profile")
 async def get_profile(user = Depends(get_current_user)):
