@@ -806,34 +806,54 @@ async def update_transaction_status(
         raise HTTPException(status_code=404, detail="Transaction not found")
     
     old_status = transaction["status"]
+    new_status = update.status.value
     
     # Update transaction
     await db.transactions.update_one(
         {"id": transaction_id},
         {"$set": {
-            "status": update.status.value,
+            "status": new_status,
             "status_note": update.note,
             "updated_at": datetime.utcnow(),
-            "updated_by": admin["id"]
+            "updated_by": admin["id"],
+            "verified_by": admin["name"] if new_status == "completed" else None,
+            "verified_at": datetime.utcnow() if new_status == "completed" else None
         }}
     )
     
     # Handle balance adjustments for status changes
-    account = await db.accounts.find_one({"user_id": transaction["user_id"]})
-    
     if transaction["type"] == "deposit":
-        if old_status == "pending" and update.status == TransactionStatus.COMPLETED:
-            # Credit the balance
+        # Approve pending_verification deposit - credit the balance
+        if old_status == "pending_verification" and new_status == "completed":
             await db.accounts.update_one(
                 {"user_id": transaction["user_id"]},
                 {"$inc": {"balance": transaction["amount"]}}
             )
-        elif old_status == "completed" and update.status in [TransactionStatus.FAILED, TransactionStatus.CANCELLED]:
-            # Reverse the credit
+            logger.info(f"Deposit {transaction_id} verified by {admin['name']}, credited {transaction['amount']}")
+        
+        # Also handle legacy pending -> completed
+        elif old_status == "pending" and new_status == "completed":
+            await db.accounts.update_one(
+                {"user_id": transaction["user_id"]},
+                {"$inc": {"balance": transaction["amount"]}}
+            )
+        
+        # Reverse credit if completed deposit is cancelled/failed
+        elif old_status == "completed" and new_status in ["failed", "cancelled"]:
             await db.accounts.update_one(
                 {"user_id": transaction["user_id"]},
                 {"$inc": {"balance": -transaction["amount"]}}
             )
+            logger.info(f"Deposit {transaction_id} reversed by {admin['name']}, debited {transaction['amount']}")
+    
+    elif transaction["type"] == "withdrawal":
+        # If withdrawal is failed/cancelled, return funds to customer
+        if old_status in ["processing", "pending"] and new_status in ["failed", "cancelled"]:
+            await db.accounts.update_one(
+                {"user_id": transaction["user_id"]},
+                {"$inc": {"balance": transaction["amount"]}}
+            )
+            logger.info(f"Withdrawal {transaction_id} cancelled by {admin['name']}, returned {transaction['amount']}")
     
     # Create audit log
     await create_audit_log(
@@ -844,12 +864,196 @@ async def update_transaction_status(
         target_id=transaction_id,
         details={
             "old_status": old_status,
-            "new_status": update.status.value,
+            "new_status": new_status,
+            "amount": transaction["amount"],
+            "customer_id": transaction["user_id"],
             "note": update.note
         }
     )
     
-    return {"message": "Transaction status updated", "new_status": update.status.value}
+    return {
+        "message": "Transaction status updated",
+        "old_status": old_status,
+        "new_status": new_status,
+        "amount": transaction["amount"]
+    }
+
+# ============== ADMIN BALANCE ADJUSTMENT ==============
+class BalanceAdjustment(BaseModel):
+    amount: float
+    type: str  # "credit" or "debit"
+    reason: str
+
+@admin_router.post("/customers/{customer_id}/adjust-balance")
+async def adjust_customer_balance(
+    customer_id: str,
+    adjustment: BalanceAdjustment,
+    admin = Depends(require_role([AdminRole.SUPER_ADMIN]))
+):
+    """Super Admin can manually adjust customer balance"""
+    user = await db.users.find_one({"id": customer_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    account = await db.accounts.find_one({"user_id": customer_id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    if adjustment.type not in ["credit", "debit"]:
+        raise HTTPException(status_code=400, detail="Type must be 'credit' or 'debit'")
+    
+    if adjustment.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    # For debit, check sufficient balance
+    if adjustment.type == "debit" and account["balance"] < adjustment.amount:
+        raise HTTPException(status_code=400, detail="Insufficient balance for debit")
+    
+    # Calculate adjustment
+    amount_change = adjustment.amount if adjustment.type == "credit" else -adjustment.amount
+    
+    # Update balance
+    await db.accounts.update_one(
+        {"user_id": customer_id},
+        {"$inc": {"balance": amount_change}}
+    )
+    
+    # Create a transaction record for audit trail
+    transaction = {
+        "id": str(uuid.uuid4()),
+        "user_id": customer_id,
+        "type": f"admin_{adjustment.type}",
+        "amount": adjustment.amount,
+        "status": "completed",
+        "description": f"Admin {adjustment.type}: {adjustment.reason}",
+        "created_at": datetime.utcnow(),
+        "completed_at": datetime.utcnow(),
+        "admin_id": admin["id"],
+        "admin_name": admin["name"]
+    }
+    await db.transactions.insert_one(transaction)
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action=f"balance_{adjustment.type}",
+        target_type="customer",
+        target_id=customer_id,
+        details={
+            "amount": adjustment.amount,
+            "type": adjustment.type,
+            "reason": adjustment.reason,
+            "old_balance": account["balance"],
+            "new_balance": account["balance"] + amount_change
+        }
+    )
+    
+    updated_account = await db.accounts.find_one({"user_id": customer_id})
+    
+    return {
+        "message": f"Balance {adjustment.type}ed successfully",
+        "amount": adjustment.amount,
+        "new_balance": updated_account["balance"],
+        "transaction_id": transaction["id"]
+    }
+
+# ============== ADMIN PENDING VERIFICATIONS ==============
+@admin_router.get("/pending-verifications")
+async def get_pending_verifications(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    admin = Depends(get_current_admin)
+):
+    """Get all transactions pending admin verification"""
+    query = {"status": "pending_verification"}
+    
+    total = await db.transactions.count_documents(query)
+    skip = (page - 1) * limit
+    
+    transactions = await db.transactions.find(query).sort("created_at", 1).skip(skip).limit(limit).to_list(limit)
+    
+    # Enrich with user data
+    enriched = []
+    for t in transactions:
+        user = await db.users.find_one({"id": t["user_id"]})
+        account = await db.accounts.find_one({"user_id": t["user_id"]})
+        enriched.append({
+            **t,
+            "_id": str(t.get("_id", "")),
+            "customer_name": user["name"] if user else "Unknown",
+            "customer_phone": user["phone"] if user else "Unknown",
+            "account_balance": account["balance"] if account else 0
+        })
+    
+    return {
+        "transactions": enriched,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+@admin_router.post("/transactions/{transaction_id}/verify")
+async def verify_deposit(
+    transaction_id: str,
+    approve: bool = True,
+    note: Optional[str] = None,
+    admin = Depends(require_role([AdminRole.TRANSACTION_MANAGER, AdminRole.SUPER_ADMIN]))
+):
+    """Quick verify or reject a pending deposit"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "status": "pending_verification"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Pending transaction not found")
+    
+    if approve:
+        # Approve - credit the balance
+        new_status = "completed"
+        await db.accounts.update_one(
+            {"user_id": transaction["user_id"]},
+            {"$inc": {"balance": transaction["amount"]}}
+        )
+        message = f"Deposit of KES {transaction['amount']:,.2f} verified and credited"
+    else:
+        # Reject
+        new_status = "failed"
+        message = f"Deposit of KES {transaction['amount']:,.2f} rejected"
+    
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": new_status,
+            "status_note": note or ("Verified by admin" if approve else "Rejected by admin"),
+            "verified_by": admin["name"],
+            "verified_at": datetime.utcnow(),
+            "updated_by": admin["id"]
+        }}
+    )
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="verify_deposit" if approve else "reject_deposit",
+        target_type="transaction",
+        target_id=transaction_id,
+        details={
+            "approved": approve,
+            "amount": transaction["amount"],
+            "customer_id": transaction["user_id"],
+            "note": note
+        }
+    )
+    
+    return {
+        "message": message,
+        "status": new_status,
+        "transaction_id": transaction_id
+    }
 
 # ============== ADMIN CUSTOMER ROUTES ==============
 @admin_router.get("/customers")
