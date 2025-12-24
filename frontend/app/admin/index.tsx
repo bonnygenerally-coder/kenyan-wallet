@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
+import { ADMIN_COLORS as COLORS, SPACING, FONT_SIZES, formatKES } from '@/src/constants/theme';
 import { getDashboardStats, DashboardStats } from '@/src/utils/adminApi';
 
 const { width } = Dimensions.get('window');
