@@ -67,6 +67,7 @@ class AdminRole(str, Enum):
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
+    PENDING_VERIFICATION = "pending_verification"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
