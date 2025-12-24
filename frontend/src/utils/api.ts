@@ -69,8 +69,31 @@ export const createWithdrawal = async (amount: number) => {
   return response.data;
 };
 
-export const calculateInterest = async () => {
-  const response = await api.post('/interest/calculate');
+// Statement Request APIs
+export interface StatementRequestData {
+  id: string;
+  months: number;
+  start_date: string;
+  end_date: string;
+  status: string;
+  email?: string;
+  created_at: string;
+  sent_at?: string;
+  admin_note?: string;
+}
+
+export const requestStatement = async (months: number, email?: string) => {
+  const response = await api.post('/statements/request', { months, email });
+  return response.data;
+};
+
+export const getMyStatementRequests = async (): Promise<StatementRequestData[]> => {
+  const response = await api.get('/statements/requests');
+  return response.data;
+};
+
+export const getStatementRequestStatus = async (requestId: string) => {
+  const response = await api.get(`/statements/request/${requestId}`);
   return response.data;
 };
 
