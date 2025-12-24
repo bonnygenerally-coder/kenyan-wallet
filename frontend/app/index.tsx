@@ -67,6 +67,14 @@ export default function WelcomeScreen() {
       <Text style={styles.disclaimer}>
         Your capital is at risk. Past performance is not a guarantee of future returns.
       </Text>
+
+      <TouchableOpacity 
+        style={styles.adminLink}
+        onPress={() => router.push('/admin/login')}
+      >
+        <Ionicons name="shield" size={16} color={COLORS.textLight} />
+        <Text style={styles.adminLinkText}>Admin Portal</Text>
+      </TouchableOpacity>
     </View>
   );
 }
