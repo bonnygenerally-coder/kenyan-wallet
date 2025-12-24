@@ -342,6 +342,9 @@ const styles = StyleSheet.create({
   successIcon: {
     marginBottom: SPACING.md,
   },
+  pendingIcon: {
+    marginBottom: SPACING.md,
+  },
   modalTitle: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
@@ -350,14 +353,29 @@ const styles = StyleSheet.create({
   modalAmount: {
     fontSize: FONT_SIZES.xxl,
     fontWeight: '700',
-    color: COLORS.success,
+    color: '#FF9800',
     marginTop: SPACING.sm,
   },
   modalMessage: {
     fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  pendingInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.background,
+    padding: SPACING.md,
+    borderRadius: 12,
     marginBottom: SPACING.lg,
+  },
+  pendingInfoText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
+    lineHeight: 18,
   },
   modalButton: {
     backgroundColor: COLORS.primary,
