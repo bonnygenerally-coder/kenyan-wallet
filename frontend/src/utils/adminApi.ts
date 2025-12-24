@@ -179,4 +179,19 @@ export const adjustCustomerBalance = async (
   return response.data;
 };
 
+// ============== INTEREST DISTRIBUTION APIs ==============
+
+export const distributeInterestToAll = async (customRate?: number) => {
+  const response = await adminApi.post('/distribute-interest', {
+    custom_rate: customRate
+  });
+  return response.data;
+};
+
+export const distributeInterestToCustomer = async (customerId: string, customRate?: number) => {
+  const params = customRate ? `?custom_rate=${customRate}` : '';
+  const response = await adminApi.post(`/distribute-interest/${customerId}${params}`);
+  return response.data;
+};
+
 export default adminApi;
