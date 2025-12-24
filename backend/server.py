@@ -650,6 +650,7 @@ async def get_dashboard_stats(admin = Depends(get_current_admin)):
         total_customers=total_customers,
         active_customers=active_customers,
         pending_transactions=pending_transactions,
+        pending_verifications=pending_verifications,
         daily_deposits=daily_deposits,
         daily_withdrawals=daily_withdrawals,
         total_interest_paid=total_interest_paid
