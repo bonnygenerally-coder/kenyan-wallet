@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: SIDEBAR_WIDTH,
-    backgroundColor: '#1a1f36',
+    backgroundColor: COLORS.sidebar,
     paddingTop: 20,
   },
   sidebarMobile: {
