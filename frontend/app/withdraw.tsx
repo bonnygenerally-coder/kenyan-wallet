@@ -155,7 +155,7 @@ export default function WithdrawScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Success Modal */}
+      {/* Success Modal - Now shows pending verification */}
       <Modal
         visible={showSuccess}
         transparent
@@ -164,12 +164,18 @@ export default function WithdrawScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.successIcon}>
-              <Ionicons name="checkmark-circle" size={64} color={COLORS.success} />
+            <View style={styles.pendingIcon}>
+              <Ionicons name="time" size={64} color="#FF9800" />
             </View>
-            <Text style={styles.modalTitle}>Withdrawal Successful!</Text>
+            <Text style={styles.modalTitle}>Withdrawal Submitted!</Text>
             <Text style={styles.modalAmount}>{formatKES(withdrawnAmount)}</Text>
-            <Text style={styles.modalMessage}>sent to {destination}</Text>
+            <Text style={styles.modalMessage}>to M-Pesa {destination}</Text>
+            <View style={styles.pendingInfo}>
+              <Ionicons name="information-circle" size={18} color={COLORS.textSecondary} />
+              <Text style={styles.pendingInfoText}>
+                Your withdrawal is pending verification and will be processed within 24 hours.
+              </Text>
+            </View>
             <Pressable
               style={styles.modalButton}
               onPress={handleSuccessDismiss}
