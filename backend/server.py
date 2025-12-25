@@ -445,6 +445,7 @@ async def get_deposit_status(transaction_id: str, user = Depends(get_current_use
 
 @api_router.post("/withdraw")
 async def create_withdrawal(withdraw: WithdrawRequest, user = Depends(get_current_user)):
+    """Create withdrawal request - requires admin approval"""
     if withdraw.amount < 50:
         raise HTTPException(status_code=400, detail="Minimum withdrawal is KES 50")
     
@@ -455,32 +456,63 @@ async def create_withdrawal(withdraw: WithdrawRequest, user = Depends(get_curren
     if account["balance"] < withdraw.amount:
         raise HTTPException(status_code=400, detail="Insufficient balance")
     
-    transaction = {
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "type": "withdrawal",
-        "amount": withdraw.amount,
-        "status": "processing",
-        "description": f"Withdrawal to M-Pesa {user['phone']}",
-        "created_at": datetime.utcnow()
-    }
-    await db.transactions.insert_one(transaction)
-    
+    # Deduct balance immediately to prevent overdraw
     await db.accounts.update_one(
         {"user_id": user["id"]},
         {"$inc": {"balance": -withdraw.amount}}
     )
     
-    await db.transactions.update_one(
-        {"id": transaction["id"]},
-        {"$set": {"status": "completed", "completed_at": datetime.utcnow()}}
-    )
+    # Create pending withdrawal transaction
+    transaction = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "type": "withdrawal",
+        "amount": withdraw.amount,
+        "status": "pending_verification",  # Requires admin approval
+        "description": f"Withdrawal to M-Pesa {user['phone']}",
+        "mpesa_number": user["phone"],
+        "created_at": datetime.utcnow(),
+        "customer_requested_at": datetime.utcnow()
+    }
+    await db.transactions.insert_one(transaction)
     
     return {
-        "message": f"KES {withdraw.amount:,.0f} sent to {user['phone']}",
+        "message": "Withdrawal request submitted",
         "transaction_id": transaction["id"],
         "amount": withdraw.amount,
-        "destination": user["phone"]
+        "destination": user["phone"],
+        "status": "pending_verification",
+        "note": "Your withdrawal is being processed and will be sent to your M-Pesa within 24 hours after admin verification."
+    }
+
+@api_router.get("/withdraw/status/{transaction_id}")
+async def get_withdrawal_status(transaction_id: str, user = Depends(get_current_user)):
+    """Check withdrawal status"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "user_id": user["id"],
+        "type": "withdrawal"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    status_messages = {
+        "pending_verification": "Your withdrawal is pending admin verification",
+        "processing": "Your withdrawal is being processed",
+        "completed": "Withdrawal sent to your M-Pesa",
+        "failed": "Withdrawal failed - funds returned to your account",
+        "cancelled": "Withdrawal was cancelled - funds returned to your account"
+    }
+    
+    return {
+        "transaction_id": transaction["id"],
+        "status": transaction["status"],
+        "message": status_messages.get(transaction["status"], "Unknown status"),
+        "amount": transaction["amount"],
+        "destination": transaction.get("mpesa_number"),
+        "created_at": transaction["created_at"],
+        "completed_at": transaction.get("completed_at")
     }
 
 @api_router.get("/transactions", response_model=List[TransactionResponse])
