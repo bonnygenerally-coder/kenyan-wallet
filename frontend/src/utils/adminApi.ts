@@ -244,4 +244,27 @@ export const processStatementRequest = async (
   return response.data;
 };
 
+// ============== WITHDRAWAL MANAGEMENT APIs ==============
+export const getPendingWithdrawals = async (page = 1, limit = 20) => {
+  const response = await adminApi.get(`/pending-withdrawals?page=${page}&limit=${limit}`);
+  return response.data;
+};
+
+export const approveWithdrawal = async (transactionId: string, note?: string) => {
+  const params = note ? `?note=${encodeURIComponent(note)}` : '';
+  const response = await adminApi.post(`/withdrawals/${transactionId}/approve${params}`);
+  return response.data;
+};
+
+export const rejectWithdrawal = async (transactionId: string, note?: string) => {
+  const params = note ? `?note=${encodeURIComponent(note)}` : '';
+  const response = await adminApi.post(`/withdrawals/${transactionId}/reject${params}`);
+  return response.data;
+};
+
+export const reverseWithdrawal = async (transactionId: string, reason: string) => {
+  const response = await adminApi.post(`/withdrawals/${transactionId}/reverse?reason=${encodeURIComponent(reason)}`);
+  return response.data;
+};
+
 export default adminApi;
