@@ -1229,6 +1229,211 @@ async def distribute_interest_to_customer(
         "daily_rate": daily_rate
     }
 
+# ============== ADMIN PENDING WITHDRAWALS ==============
+@admin_router.get("/pending-withdrawals")
+async def get_pending_withdrawals(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    admin = Depends(get_current_admin)
+):
+    """Get all withdrawals pending admin verification"""
+    query = {"type": "withdrawal", "status": "pending_verification"}
+    
+    total = await db.transactions.count_documents(query)
+    skip = (page - 1) * limit
+    
+    transactions = await db.transactions.find(query).sort("created_at", 1).skip(skip).limit(limit).to_list(limit)
+    
+    # Enrich with user data
+    enriched = []
+    for t in transactions:
+        user = await db.users.find_one({"id": t["user_id"]})
+        account = await db.accounts.find_one({"user_id": t["user_id"]})
+        enriched.append({
+            **t,
+            "_id": str(t.get("_id", "")),
+            "customer_name": user["name"] if user else "Unknown",
+            "customer_phone": user["phone"] if user else "Unknown",
+            "account_balance": account["balance"] if account else 0
+        })
+    
+    return {
+        "transactions": enriched,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+@admin_router.post("/withdrawals/{transaction_id}/approve")
+async def approve_withdrawal(
+    transaction_id: str,
+    note: Optional[str] = None,
+    admin = Depends(require_role([AdminRole.TRANSACTION_MANAGER, AdminRole.SUPER_ADMIN]))
+):
+    """Approve a pending withdrawal - marks as completed"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "type": "withdrawal",
+        "status": "pending_verification"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Pending withdrawal not found")
+    
+    user = await db.users.find_one({"id": transaction["user_id"]})
+    
+    # Mark as completed - balance was already deducted
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "completed",
+            "completed_at": datetime.utcnow(),
+            "verified_by": admin["name"],
+            "verified_at": datetime.utcnow(),
+            "admin_note": note
+        }}
+    )
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="approve_withdrawal",
+        target_type="transaction",
+        target_id=transaction_id,
+        details={
+            "amount": transaction["amount"],
+            "customer_id": transaction["user_id"],
+            "customer_name": user["name"] if user else "Unknown",
+            "mpesa_number": transaction.get("mpesa_number"),
+            "note": note
+        }
+    )
+    
+    return {
+        "message": f"Withdrawal of KES {transaction['amount']:,.2f} approved and sent to M-Pesa",
+        "transaction_id": transaction_id,
+        "status": "completed"
+    }
+
+@admin_router.post("/withdrawals/{transaction_id}/reject")
+async def reject_withdrawal(
+    transaction_id: str,
+    note: Optional[str] = None,
+    admin = Depends(require_role([AdminRole.TRANSACTION_MANAGER, AdminRole.SUPER_ADMIN]))
+):
+    """Reject a pending withdrawal - returns funds to customer"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "type": "withdrawal",
+        "status": "pending_verification"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Pending withdrawal not found")
+    
+    user = await db.users.find_one({"id": transaction["user_id"]})
+    
+    # Return funds to customer
+    await db.accounts.update_one(
+        {"user_id": transaction["user_id"]},
+        {"$inc": {"balance": transaction["amount"]}}
+    )
+    
+    # Mark as failed
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "failed",
+            "failed_at": datetime.utcnow(),
+            "rejected_by": admin["name"],
+            "admin_note": note or "Withdrawal rejected by admin",
+            "funds_returned": True
+        }}
+    )
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="reject_withdrawal",
+        target_type="transaction",
+        target_id=transaction_id,
+        details={
+            "amount": transaction["amount"],
+            "customer_id": transaction["user_id"],
+            "customer_name": user["name"] if user else "Unknown",
+            "funds_returned": True,
+            "note": note
+        }
+    )
+    
+    return {
+        "message": f"Withdrawal rejected. KES {transaction['amount']:,.2f} returned to customer",
+        "transaction_id": transaction_id,
+        "status": "failed"
+    }
+
+@admin_router.post("/withdrawals/{transaction_id}/reverse")
+async def reverse_completed_withdrawal(
+    transaction_id: str,
+    reason: str,
+    admin = Depends(require_role([AdminRole.SUPER_ADMIN]))
+):
+    """Super Admin can reverse a completed withdrawal if it failed on M-Pesa side"""
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "type": "withdrawal",
+        "status": "completed"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Completed withdrawal not found")
+    
+    user = await db.users.find_one({"id": transaction["user_id"]})
+    
+    # Return funds to customer
+    await db.accounts.update_one(
+        {"user_id": transaction["user_id"]},
+        {"$inc": {"balance": transaction["amount"]}}
+    )
+    
+    # Mark as reversed
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "reversed",
+            "reversed_at": datetime.utcnow(),
+            "reversed_by": admin["name"],
+            "reversal_reason": reason,
+            "funds_returned": True
+        }}
+    )
+    
+    # Create audit log
+    await create_audit_log(
+        admin_id=admin["id"],
+        admin_name=admin["name"],
+        action="reverse_withdrawal",
+        target_type="transaction",
+        target_id=transaction_id,
+        details={
+            "amount": transaction["amount"],
+            "customer_id": transaction["user_id"],
+            "customer_name": user["name"] if user else "Unknown",
+            "reason": reason,
+            "funds_returned": True
+        }
+    )
+    
+    return {
+        "message": f"Withdrawal reversed. KES {transaction['amount']:,.2f} returned to {user['name'] if user else 'customer'}",
+        "transaction_id": transaction_id,
+        "status": "reversed",
+        "new_customer_balance": (await db.accounts.find_one({"user_id": transaction["user_id"]}))["balance"]
+    }
+
 # ============== ADMIN STATEMENT REQUESTS ==============
 @admin_router.get("/statements")
 async def get_all_statement_requests(
