@@ -1354,7 +1354,13 @@ async def get_statement_request_detail(request_id: str, admin = Depends(get_curr
             "amount": t["amount"],
             "status": t["status"],
             "description": t.get("description", ""),
-            "created_at": t["created_at"]
+            "created_at": t["created_at"],
+            "date": t["created_at"].strftime("%Y-%m-%d"),
+            "time": t["created_at"].strftime("%H:%M:%S"),
+            "day": t["created_at"].strftime("%d"),
+            "month": t["created_at"].strftime("%B"),
+            "year": t["created_at"].strftime("%Y"),
+            "datetime_formatted": t["created_at"].strftime("%d %B %Y at %H:%M")
         } for t in transactions]
     }
 
