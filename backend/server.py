@@ -28,8 +28,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # MongoDB connection with Atlas support
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+# Support both MONGO_URI (Render) and MONGO_URL (legacy) environment variables
+mongo_url = os.environ.get('MONGO_URI') or os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'dolaglobo_mmf')
+
+# Log connection info (without password)
+logger.info(f"Connecting to MongoDB: {mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost'}")
 
 # Create MongoDB client with proper settings for Atlas
 client = AsyncIOMotorClient(
