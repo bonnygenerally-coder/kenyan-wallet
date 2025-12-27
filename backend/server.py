@@ -1935,3 +1935,42 @@ async def startup_db_client():
 async def shutdown_db_client():
     client.close()
     logger.info("MongoDB connection closed")
+
+# ============== STATIC FILE SERVING FOR RENDER ==============
+# Serve frontend static files in production
+STATIC_DIR = Path(__file__).parent.parent / "frontend" / "dist"
+
+if STATIC_DIR.exists():
+    # Serve static assets
+    app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+    app.mount("/_expo", StaticFiles(directory=str(STATIC_DIR / "_expo")), name="expo")
+    
+    # Serve HTML files for all routes
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Skip API routes
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Try to serve the exact HTML file
+        file_path = STATIC_DIR / f"{full_path}.html"
+        if file_path.exists():
+            return FileResponse(file_path)
+        
+        # Try with index.html for directory paths
+        dir_index = STATIC_DIR / full_path / "index.html"
+        if dir_index.exists():
+            return FileResponse(dir_index)
+        
+        # Check if it's a direct file request
+        direct_file = STATIC_DIR / full_path
+        if direct_file.exists() and direct_file.is_file():
+            return FileResponse(direct_file)
+        
+        # Default to index.html for SPA routing
+        index_file = STATIC_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        
+        raise HTTPException(status_code=404, detail="Not found")
+
